@@ -1,0 +1,9 @@
+rootProject.name = 'doro-notify'
+
+// Doro SDK(IAM JWKS 토큰 검증·세션 확인·탈퇴 동기화): 형제 디렉터리 ../Doro 의 sdk 프로젝트를 그대로 쓴다(doro-interview·doro-games 와 같은 방식).
+// 이미지 빌드는 Dockerfile 이 Doro 의 필요한 부분만 /work/Doro 로 가져와 같은 상대 경로를 만든다.
+includeBuild('../Doro') {
+    dependencySubstitution {
+        substitute module('com.hunnit-beasts:doro-sdk') using project(':sdk')
+    }
+}

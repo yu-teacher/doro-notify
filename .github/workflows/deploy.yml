@@ -1,0 +1,49 @@
+name: Deploy
+
+# CI 가 main 에서 통과한 커밋만 서버(mini)의 셀프호스티드 러너가 배포한다. 수동 실행은 workflow_dispatch.
+# 저장소 변수 CD_ENABLED=true 가 아니면 건너뛴다(러너를 등록하기 전에 작업이 대기열에 쌓이지 않게).
+# 공개 저장소이므로 pull_request 에는 절대 반응하지 않는다(외부 기여자의 코드가 서버 러너에서 실행되면 안 된다).
+# 처음 한 번은 사람이 한다: 서버 준비·게이트웨이 반영·Doro 쪽 게이트웨이·토큰 연결(docs/DESIGN.md 의 "배포와 운영"). 이 워크플로는 그 뒤의 반복 배포만 맡는다.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 배포가 겹치면 같은 컨테이너를 동시에 건드리므로 순서대로 하나씩 실행한다.
+concurrency:
+  group: notify-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy on the server
+    if: >-
+      vars.CD_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: self-hosted
+    timeout-minutes: 40
+    steps:
+      # settings.gradle 의 includeBuild('../Doro') 와 이미지 빌드(additional_contexts)가 Doro SDK 소스를 쓴다: Doro 레포가 형제 디렉터리로 필요하다.
+      - uses: actions/checkout@v4
+        with:
+          path: doro-notify
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/checkout@v4
+        with:
+          repository: yu-teacher/doro
+          path: Doro
+      # 서버의 .env(DB 계정·내부 토큰)는 저장소에 없고 서버의 ~/doro-notify/.env 에 있다. 배포 스크립트는 값을 출력하지 않는다.
+      - run: NOTIFY_ENV_FILE="$HOME/doro-notify/.env" scripts/deploy-on-server.sh --apply
+        working-directory: doro-notify
+        env:
+          DORO_DIR: ${{ github.workspace }}/Doro
+        shell: bash
+      - if: failure()
+        run: |
+          echo "배포 실패 - 서버에서 docs/DESIGN.md "배포와 운영"의 수동 롤백 절차를 확인한다(스크립트가 이전 이미지로 되돌렸다면 서비스는 그대로다)."

@@ -1,0 +1,110 @@
+server:
+  port: ${SERVER_PORT:8089}
+
+spring:
+  application:
+    name: doro-notify
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:25434}/${DB_NAME:service_notify}
+    username: ${DB_USER:doro_admin}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+      max-lifetime: 1800000
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    table: notify_schema_history
+    locations: classpath:db/migration
+
+doro:
+  iam:
+    # 게이트웨이(BFF)나 허브가 붙여 준 Authorization: Bearer 를 이 서비스가 JWKS 로 검증한다. 잘못된·만료된 토큰은 익명으로 취급된다(SDK 규칙).
+    jwks-uri: http://${IAM_HOST:localhost}:${IAM_PORT:28080}/.well-known/jwks.json
+    # 받아 줄 OAuth 클라이언트(앱별 BFF 클라이언트)의 토큰(cid). 허브가 쓰는 IAM 액세스 토큰은 cid 가 없다. 목록은 알림을 쓰는 앱 BFF 클라이언트와 맞춘다.
+    oauth-client-ids: ${NOTIFY_OAUTH_CLIENT_IDS:doro-party,doro-blog,doro-games,doro-menu}
+    # 다른 곳에서 로그아웃하면 이 서비스의 세션도 바로 끝난다(IAM 에 닿지 못하면 통과 = fail-open, 다른 서비스와 같은 값)
+    revocation-check: ${DORO_IAM_REVOCATION_CHECK:ENFORCE}
+    # 탈퇴 사용자 목록 조회용 서버 간 호출(게이트웨이를 거치지 않는 Docker 내부 주소)과 호출자 토큰
+    internal-url: http://${IAM_HOST:localhost}:${IAM_PORT:28080}
+    internal-token: ${DORO_IAM_INTERNAL_TOKEN:}
+  guard:
+    # 이 서비스는 본인 데이터만 다루므로 Guard 로 판정할 것이 없다(사용자 id 는 토큰에서만 얻는다).
+    enabled: false
+  web:
+    # SDK 의 예외 핸들러는 Guard 예외만 다룬다. 우리 GlobalExceptionHandler 가 오류 규격을 한 곳에서 맡는다.
+    exception-handler: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      # 의존 서비스 상세는 인증 없이 노출하지 않는다. 상태(UP/DOWN)만 공개된다.
+      show-details: when-authorized
+
+logging:
+  # 로그는 stdout 으로만 낸다(수집기가 가져간다). traceId 는 SDK 필터가 MDC 에 넣는다(요청 처리·발송 워커 로그 모두).
+  pattern:
+    level: "%5p [traceId=%X{traceId:-}]"
+  level:
+    root: INFO
+    com.doro.notify: ${LOG_LEVEL_APP:INFO}
+
+notify:
+  # 서비스 간 내부 API(/internal/**) 호출자 인증. 형식 '이름:토큰,이름:토큰'(이름 = 알림 앱 id: party, blog, ...). 토큰은 32자 이상, 환경변수로만 준다.
+  internal-auth:
+    mode: ${NOTIFY_INTERNAL_AUTH_MODE:ENFORCE}
+    tokens: ${NOTIFY_INTERNAL_TOKENS:}
+
+  # 웹 푸시. VAPID 키 쌍과 연락처가 모두 있어야 켜진다(없으면 푸시만 꺼진 채 서비스는 정상 기동한다).
+  push:
+    vapid-public-key: ${NOTIFY_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${NOTIFY_VAPID_PRIVATE_KEY:}
+    subject: ${NOTIFY_VAPID_SUBJECT:}
+    # 구독 주소로 받아도 되는 푸시 서비스 도메인(하위 도메인 포함). 서버가 이 주소로 직접 접속하므로 목록 밖은 거절한다.
+    allowed-hosts: ${NOTIFY_PUSH_ALLOWED_HOSTS:fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,notify.windows.com}
+    require-https: ${NOTIFY_PUSH_REQUIRE_HTTPS:true}
+    request-timeout: ${NOTIFY_PUSH_REQUEST_TIMEOUT:PT10S}
+    max-subscriptions-per-app: ${NOTIFY_PUSH_MAX_SUBSCRIPTIONS_PER_APP:10}
+    failures-before-removal: ${NOTIFY_PUSH_FAILURES_BEFORE_REMOVAL:5}
+    worker-threads: ${NOTIFY_PUSH_WORKER_THREADS:4}
+
+  # 알림 요청의 상한(넘으면 400)
+  request:
+    max-recipients: ${NOTIFY_MAX_RECIPIENTS:500}
+    default-ttl: ${NOTIFY_DEFAULT_TTL:PT24H}
+    max-ttl: ${NOTIFY_MAX_TTL:P7D}
+    title-max: 120
+    body-max: 500
+    tag-max: 128
+    url-max: 1024
+
+  # 발송 워커. 일시 오류는 30초부터 두 배씩(최대 30분) 늘려 총 8번까지 시도하되 알림의 만료 시각 안에서만 한다.
+  worker:
+    enabled: ${NOTIFY_WORKER_ENABLED:true}
+    poll-interval: ${NOTIFY_WORKER_POLL_INTERVAL:PT1S}
+    batch-size: ${NOTIFY_WORKER_BATCH_SIZE:20}
+    lease: ${NOTIFY_WORKER_LEASE:PT2M}
+    max-attempts: ${NOTIFY_WORKER_MAX_ATTEMPTS:8}
+    backoff-base: ${NOTIFY_WORKER_BACKOFF_BASE:PT30S}
+    backoff-max: ${NOTIFY_WORKER_BACKOFF_MAX:PT30M}
+
+  # 정합성 점검(주기 작업): 보관 기간이 지난 요청·작업 삭제, 탈퇴 사용자 잔존 구독 정리, 오래 쓰지 않은 구독 정리
+  retention:
+    enabled: ${NOTIFY_RETENTION_ENABLED:true}
+    request-age: ${NOTIFY_RETENTION_REQUEST_AGE:P14D}
+    stale-subscription-age: ${NOTIFY_RETENTION_STALE_SUBSCRIPTION_AGE:P180D}
+    interval: ${NOTIFY_RETENTION_INTERVAL:PT1H}
+
+  # Doro 에서 영구 탈퇴한 사용자의 구독·설정을 주기적으로 지운다. IAM 내부 API 를 조회하므로 서비스 토큰이 필요하다
+  # (DORO_IAM_INTERNAL_TOKEN, IAM 의 DORO_IAM_INTERNAL_TOKENS 에 'notify:<토큰>' 으로 등록). 토큰이 없으면 호출이 거절되어 경고가 남는다.
+  deleted-sync:
+    enabled: ${NOTIFY_DELETED_SYNC_ENABLED:true}
+    interval: ${NOTIFY_DELETED_SYNC_INTERVAL:PT1H}

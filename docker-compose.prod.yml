@@ -1,0 +1,46 @@
+# 운영(mini) 참고용 compose. **서버에 있는 실제 파일이 기준이고 배포가 덮어쓰지 않는다**(doro-interview·games·party 와 같은 규칙).
+# 서버의 ~/doro-notify/.env 에 DB_USER, DB_PASSWORD 가 있어야 한다(서비스 전용 DB 역할: Doro/scripts/split-db-accounts.sh).
+# 웹 컨테이너는 없다(UI 는 허브와 각 앱이 맡는다). 로그인은 서비스 밖에서 처리되고 서비스는 게이트웨이·허브가 붙인 Bearer 를 JWKS 로 검증한다.
+# 그 밖의 .env 값(모두 값은 문서·로그에 쓰지 않는다):
+#   NOTIFY_INTERNAL_TOKENS      내부 API 호출자 토큰 '이름:토큰,이름:토큰'(이름 = 알림 앱 id, 토큰 32자 이상)
+#   NOTIFY_VAPID_PUBLIC_KEY / NOTIFY_VAPID_PRIVATE_KEY / NOTIFY_VAPID_SUBJECT   웹 푸시(없으면 푸시만 꺼진다)
+#   DORO_IAM_INTERNAL_TOKEN     탈퇴 동기화용 IAM 내부 API 호출자 토큰(Doro/scripts/enable-deleted-sync.sh 가 발급)
+services:
+  notify-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Doro SDK 소스(settings.gradle 의 includeBuild). 서버에서는 Doro 체크아웃 경로를 DORO_DIR 로 준다.
+      additional_contexts:
+        doro: ${DORO_DIR:-../Doro}
+    image: doro-notify-api:latest
+    container_name: doro-notify-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8089:8089"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: service_notify
+      DB_USER: ${DB_USER:?DB_USER must be set in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      # Doro IAM(JWKS·세션 확인). 게이트웨이(BFF)·허브가 붙인 Bearer 를 검증한다.
+      IAM_HOST: auth-api
+      IAM_PORT: 8080
+      # 받아 줄 앱 BFF 클라이언트(cid) 목록. 허브 토큰은 cid 가 없다.
+      NOTIFY_OAUTH_CLIENT_IDS: ${NOTIFY_OAUTH_CLIENT_IDS:-doro-party,doro-blog,doro-games,doro-menu}
+      # IAM 내부 API(탈퇴 사용자 목록) 호출자 토큰. 비어 있으면 호출이 거절된다(경고).
+      DORO_IAM_INTERNAL_TOKEN: ${DORO_IAM_INTERNAL_TOKEN:-}
+      # 이 서비스의 내부 API(/internal/**)를 부르는 서비스들의 토큰. 비어 있으면 모든 내부 요청이 거절된다.
+      NOTIFY_INTERNAL_TOKENS: ${NOTIFY_INTERNAL_TOKENS:-}
+      NOTIFY_INTERNAL_AUTH_MODE: ${NOTIFY_INTERNAL_AUTH_MODE:-ENFORCE}
+      NOTIFY_VAPID_PUBLIC_KEY: ${NOTIFY_VAPID_PUBLIC_KEY:-}
+      NOTIFY_VAPID_PRIVATE_KEY: ${NOTIFY_VAPID_PRIVATE_KEY:-}
+      NOTIFY_VAPID_SUBJECT: ${NOTIFY_VAPID_SUBJECT:-}
+    networks:
+      - doro-network
+
+networks:
+  doro-network:
+    external: true
+    name: doro_doro-network
