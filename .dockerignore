@@ -1,0 +1,11 @@
+.git
+.gradle
+build
+.private
+.env
+.env.*
+docs
+web
+scripts
+.github
+*.md

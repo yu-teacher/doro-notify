@@ -1,0 +1,38 @@
+name: CI
+
+# main 푸시와 PR 마다 백엔드 테스트를 돌린다. 이 워크플로는 배포하지 않는다(CI 가 main 에서 통과한 뒤의 배포는 deploy.yml 이 맡는다).
+# 웹 컨테이너가 없는 서비스라 프런트·Playwright 단계는 없다.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (tests on an isolated Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # settings.gradle 의 includeBuild('../Doro') 때문에 Doro 레포가 형제 디렉터리로 필요하다(doro-interview 와 같은 모양)
+      - uses: actions/checkout@v4
+        with:
+          path: doro-notify
+      - uses: actions/checkout@v4
+        with:
+          repository: yu-teacher/doro
+          path: Doro
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+      # 격리 Postgres 기동 → gradle test(마이그레이션·API·발송 워커·푸시 암호화 벡터) → 정리
+      - run: scripts/ci-test.sh backend
+        working-directory: doro-notify

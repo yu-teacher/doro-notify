@@ -1,0 +1,60 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.doro'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs << '-parameters'
+}
+
+dependencies {
+    // DORO SDK: Bearer(JWT) 검증, 탈퇴 동기화. Guard 는 쓰지 않는다(doro.guard.enabled=false).
+    implementation 'com.hunnit-beasts:doro-sdk'
+
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Database & Flyway
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    maxHeapSize = '1024m'
+    // 테스트는 scripts/ci-test.sh 가 올리는 격리 Postgres 를 쓴다(개발·운영 DB 가 아니다). 비밀번호는 테스트 전용 값이다.
+    environment 'DB_PASSWORD', System.getenv('DB_PASSWORD') ?: 'ci-only-password'
+    environment 'DB_PORT', System.getenv('DB_PORT') ?: System.getenv('CI_DB_PORT') ?: '25434'
+    // 주기 탈퇴 동기화·발송 워커·정리 작업은 시험 중에 저절로 돌지 않는다(각 시험이 직접 부른다)
+    environment 'NOTIFY_DELETED_SYNC_ENABLED', 'false'
+    environment 'NOTIFY_WORKER_ENABLED', 'false'
+    environment 'NOTIFY_RETENTION_ENABLED', 'false'
+    // 개발자 셸에 PUSH_LIVE_DIR 가 남아 있어도 실제 푸시 서비스 시험은 명시적으로 켠 때만 돈다
+    environment 'PUSH_LIVE_DIR', System.getenv('PUSH_LIVE_DIR') ?: ''
+}
+
+jar {
+    enabled = false
+}
