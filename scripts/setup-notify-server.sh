@@ -17,7 +17,8 @@
 # 환경변수(리허설·점검용, 기본값은 운영): POSTGRES_CONTAINER, DORO_ENV, NOTIFY_DIR, PARTY_ENV
 set -Eeuo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ssh mini 'bash -s' < 스크립트 처럼 표준입력으로 실행하면 BASH_SOURCE 가 비어 있다(set -u 에서 오류). 이때는 현재 디렉터리를 쓴다(lib/vapid.sh 는 --vapid-generate 에서만 필요).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || pwd)"
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-doro-postgres}"
 DORO_ENV="${DORO_ENV:-$HOME/doro/.env}"
 PARTY_ENV="${PARTY_ENV:-$HOME/doro-party/.env}"
