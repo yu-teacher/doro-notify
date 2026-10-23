@@ -46,12 +46,29 @@ for n in "${NAMES[@]}"; do
   printf '%s' "$n" | grep -Eq '^[a-z0-9-]+$' || die "호출자 이름은 소문자·숫자·하이픈만 쓴다: '$n'"
 done
 
+restart_notify() {
+  log "알림 컨테이너를 다시 만든다(새 토큰을 읽게 한다)"
+  ( cd "$DIR" && docker compose -p notify -f docker-compose.prod.yml up -d --no-build --no-deps --force-recreate notify-api ) >/dev/null
+  for _ in $(seq 1 40); do
+    [ "$(docker inspect doro-notify-api --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && { log "doro-notify-api 가 healthy 로 돌아왔다"; return 0; }
+    sleep 3
+  done
+  die "doro-notify-api 가 healthy 로 돌아오지 않았다"
+}
+
 MISSING=()
 for n in "${NAMES[@]}"; do
   if has_entry "$n"; then log "[$n] 호출자 토큰: 있음(그대로 둔다)"; else log "[$n] 호출자 토큰: 없음"; MISSING+=("$n"); fi
 done
-if [ "${#MISSING[@]}" -eq 0 ]; then log "만들 항목이 없다."; exit 0; fi
-if [ "$APPLY" != true ]; then log "--dry-run: 여기서 종료 (--apply 로 반영)"; exit 0; fi
+if [ "$APPLY" != true ]; then
+  [ "${#MISSING[@]}" -eq 0 ] && log "만들 항목이 없다." || log "--dry-run: 여기서 종료 (--apply 로 반영)"
+  exit 0
+fi
+if [ "${#MISSING[@]}" -eq 0 ]; then
+  log "만들 항목이 없다."
+  [ "$RESTART" != true ] || restart_notify
+  exit 0
+fi
 
 TS="$(date +%Y%m%d-%H%M%S)"
 cp -p "$ENV_FILE" "$ENV_FILE.bak-tokens-$TS"; log ".env 백업: $ENV_FILE.bak-tokens-$TS"
@@ -66,13 +83,5 @@ done
 set_var "$ENV_FILE" NOTIFY_INTERNAL_TOKENS "$CUR"
 unset CUR
 
-if [ "$RESTART" = true ]; then
-  log "알림 컨테이너를 다시 만든다(새 토큰을 읽게 한다)"
-  ( cd "$DIR" && docker compose -p notify -f docker-compose.prod.yml up -d --no-build --no-deps --force-recreate notify-api ) >/dev/null
-  for _ in $(seq 1 40); do
-    [ "$(docker inspect doro-notify-api --format '{{.State.Health.Status}}' 2>/dev/null)" = healthy ] && { log "doro-notify-api 가 healthy 로 돌아왔다"; exit 0; }
-    sleep 3
-  done
-  die "doro-notify-api 가 healthy 로 돌아오지 않았다(.env 백업: $ENV_FILE.bak-tokens-$TS)"
-fi
+[ "$RESTART" != true ] || { restart_notify; exit 0; }
 log "컨테이너는 그대로다. 새 토큰은 --restart 또는 다음 배포 때 반영된다."
