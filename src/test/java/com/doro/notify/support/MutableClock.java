@@ -34,4 +34,9 @@ public final class MutableClock extends Clock {
     public Instant instant() {
         return now.get();
     }
+
+    /** Postgres 는 시각을 마이크로초로 저장(반올림)하므로, 나노초 시계(Linux)에서 저장값이 시험 시계와 어긋나 경계 비교가 흔들리지 않게 마이크로초로 자른다. */
+    private static Instant microsNow() {
+        return Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
 }
