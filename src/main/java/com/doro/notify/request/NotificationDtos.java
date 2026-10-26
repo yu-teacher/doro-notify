@@ -33,6 +33,6 @@ public final class NotificationDtos {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record TypesRequest(List<TypeRegistration> types) {
+    public record TypesRequest(List<TypeRegistration> types, String scopePath) {
     }
 }
