@@ -96,6 +96,15 @@ public class SubscriptionService {
         return subscriptions.deleteByEndpoint(userId, endpoint.strip());
     }
 
+    /** 이 앱으로 등록된 구독만 지운다. 없어도 오류가 아니다. */
+    @Transactional
+    public int unsubscribe(UUID userId, String appId, String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            throw new NotifyException(ErrorCode.INVALID_INPUT);
+        }
+        return subscriptions.deleteByEndpointInApp(userId, appId, endpoint.strip());
+    }
+
     /** 이 기기의 내 모든 앱 구독을 지운다(로그아웃 때). */
     @Transactional
     public int removeDevice(UUID userId, String deviceId) {

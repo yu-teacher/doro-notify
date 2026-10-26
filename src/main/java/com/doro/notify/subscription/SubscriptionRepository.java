@@ -99,6 +99,12 @@ public class SubscriptionRepository {
         return jdbc.sql("DELETE FROM push_subscriptions WHERE endpoint = :e AND user_id = :u").param("e", endpoint).param("u", userId).update();
     }
 
+    /** 이 앱으로 등록된 내 구독만 지운다(서비스가 자기 앱의 구독만 정리할 때). */
+    public int deleteByEndpointInApp(UUID userId, String appId, String endpoint) {
+        return jdbc.sql("DELETE FROM push_subscriptions WHERE endpoint = :e AND user_id = :u AND app_id = :a")
+                .param("e", endpoint).param("u", userId).param("a", appId).update();
+    }
+
     /** 이 기기(deviceId)의 내 모든 앱 구독을 지운다. */
     public int deleteByDevice(UUID userId, String deviceId) {
         return jdbc.sql("DELETE FROM push_subscriptions WHERE device_id = :d AND user_id = :u").param("d", deviceId).param("u", userId).update();
