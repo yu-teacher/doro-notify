@@ -50,9 +50,9 @@ CREATE TABLE notify_import_subs (id uuid, user_id uuid, endpoint text, p256dh te
 CREATE TABLE notify_import_prefs (user_id uuid, comments boolean, friend_requests boolean, shares boolean);
 SQL
 
-docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $PARTY_DB -v ON_ERROR_STOP=1 -c \"\\copy (SELECT id, user_id, endpoint, p256dh, auth, user_agent, created_at, last_success_at, failure_count FROM push_subscriptions) TO STDOUT WITH CSV\"" \
+docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $PARTY_DB -v ON_ERROR_STOP=1 -c \"\\copy (SELECT id, user_id, endpoint, p256dh, auth, user_agent, created_at, last_success_at, failure_count FROM push_subscriptions) TO STDOUT WITH CSV\"" </dev/null \
   | docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $NOTIFY_DB -v ON_ERROR_STOP=1 -c \"\\copy notify_import_subs FROM STDIN WITH CSV\"" >/dev/null
-docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $PARTY_DB -v ON_ERROR_STOP=1 -c \"\\copy (SELECT user_id, comments, friend_requests, shares FROM push_preferences) TO STDOUT WITH CSV\"" \
+docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $PARTY_DB -v ON_ERROR_STOP=1 -c \"\\copy (SELECT user_id, comments, friend_requests, shares FROM push_preferences) TO STDOUT WITH CSV\"" </dev/null \
   | docker exec -i "$POSTGRES_CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $NOTIFY_DB -v ON_ERROR_STOP=1 -c \"\\copy notify_import_prefs FROM STDIN WITH CSV\"" >/dev/null
 
 cat <<'SQL' | psql_in "$NOTIFY_DB" >/dev/null
