@@ -40,6 +40,8 @@ import java.util.regex.Pattern;
 @RequestMapping("/internal/v1")
 class InternalController {
 
+    /** 앱 범위 경로: '/' 로 시작하고 끝나며(루트 '/' 는 안 된다) 안전한 글자만. 앱이 마운트된 공개 경로다(예: /party/, /dev/blog/). */
+    private static final Pattern SCOPE_PATH = Pattern.compile("^/[A-Za-z0-9._~-]+(/[A-Za-z0-9._~-]+)*/$");
     private static final Pattern TYPE_ID = Pattern.compile("^[a-z][a-z0-9_-]{0,47}$");
     private static final int MAX_TYPES = 50;
     private static final int LABEL_MAX = 60;
@@ -93,6 +95,14 @@ class InternalController {
             }
             types.add(new NotifyType(known.appId(), item.type(), item.label().strip(), item.description() == null ? "" : item.description(),
                     item.defaultOn() == null || item.defaultOn(), false));
+        }
+        String scopePath = request.scopePath();
+        if (scopePath != null) {
+            // 서비스가 옮겨진 자기 공개 경로를 알린다. '..' 같은 조각이 있거나 길면 거절한다.
+            if (scopePath.length() > 100 || !SCOPE_PATH.matcher(scopePath).matches() || scopePath.contains("..")) {
+                throw new NotifyException(ErrorCode.INVALID_INPUT, "scopePath 가 올바르지 않습니다.");
+            }
+            registry.updateScopePath(known.appId(), scopePath);
         }
         registry.registerTypes(known.appId(), types);
         return ApiResponse.success(new RegisteredTypes(known.appId(), types.size()));

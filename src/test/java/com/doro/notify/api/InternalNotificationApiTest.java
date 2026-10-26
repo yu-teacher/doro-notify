@@ -329,6 +329,28 @@ class InternalNotificationApiTest extends AbstractNotifyTest {
     }
 
     @Test
+    @DisplayName("종류 등록에 scopePath 를 실으면 그 앱의 알림 주소 범위가 바뀐다(공개 경로가 옮겨질 때). 이상한 경로는 거절한다")
+    void servicesCanMoveTheirOwnScopePath() throws Exception {
+        String types = "\"types\":[{\"type\":\"comment\",\"label\":\"댓글\"}]";
+        // 원래 범위는 /blog/ 라서 /dev/blog/ 주소는 거절된다
+        notify(BLOG_TOKEN, json("k1", "blog", "comment", new UUID[] {alice}, "/dev/blog/@u/p", "")).andExpect(status().isBadRequest());
+        perform(internal(put("/internal/v1/apps/blog/types"), BLOG_TOKEN).content("{" + types + ",\"scopePath\":\"/dev/blog/\"}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select scope_path from notify_apps where app_id = 'blog'", String.class)).isEqualTo("/dev/blog/");
+        notify(BLOG_TOKEN, json("k2", "blog", "comment", new UUID[] {alice}, "/dev/blog/@u/p", "")).andExpect(status().isOk());
+        notify(BLOG_TOKEN, json("k3", "blog", "comment", new UUID[] {alice}, "/blog/@u/p", "")).andExpect(status().isBadRequest());   // 옛 범위는 더 이상 아니다
+
+        for (String bad : new String[] {"/", "dev/blog/", "/dev/blog", "/dev/../blog/", "//evil/", "/a b/", "/%2e%2e/"}) {
+            perform(internal(put("/internal/v1/apps/blog/types"), BLOG_TOKEN).content("{" + types + ",\"scopePath\":\"" + bad + "\"}")).andExpect(status().isBadRequest());
+        }
+        assertThat(jdbc.queryForObject("select scope_path from notify_apps where app_id = 'blog'", String.class)).isEqualTo("/dev/blog/");
+        // 다른 앱의 범위는 바꿀 수 없다(호출자 이름과 app 이 같아야 한다)
+        perform(internal(put("/internal/v1/apps/party/types"), BLOG_TOKEN).content("{" + types + ",\"scopePath\":\"/x/\"}")).andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("select scope_path from notify_apps where app_id = 'party'", String.class)).isEqualTo("/party/");
+        // 시험이 서로 영향을 주지 않게 되돌려 둔다
+        jdbc.update("update notify_apps set scope_path = '/blog/' where app_id = 'blog'");
+    }
+
+    @Test
     @DisplayName("stats 는 상태별 건수와 가장 오래된 PENDING 의 나이만 주고 알림 내용은 없다")
     void stats() throws Exception {
         subscribe(alice, "party", "device-aaaaaaaa");

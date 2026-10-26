@@ -53,6 +53,12 @@ public class AppRegistry {
                 .optional();
     }
 
+    /** 앱이 마운트된 공개 경로(알림 주소가 가리킬 수 있는 범위)를 바꾼다. 서비스의 공개 주소가 옮겨질 때 서비스가 스스로 알린다. */
+    @Transactional
+    public void updateScopePath(String appId, String scopePath) {
+        jdbc.sql("UPDATE notify_apps SET scope_path = :s WHERE app_id = :a").param("s", scopePath).param("a", appId).update();
+    }
+
     /**
      * 앱의 알림 종류를 등록한다(멱등). 목록에 있는 종류는 upsert 하고 deprecated 를 해제하며, 목록에 없는 기존 종류는 지우지 않고
      * deprecated 로 표시한다(사용자 설정 행을 보존한다). 그러므로 호출자는 **현재 쓰는 종류 전체**를 보내야 한다.
