@@ -19,7 +19,7 @@
 ```bash
 scripts/ci-test.sh backend   # 격리 Postgres(기본 포트 25434)를 올려 백엔드 테스트 후 내린다
 ```
-필요: Docker, Java 25, 형제 디렉터리의 Doro 체크아웃(`../Doro`, SDK 를 쓴다). 다른 실행과 겹치면 `CI_PROJECT`·`CI_DB_PORT` 를 바꾼다.
+필요: Docker, Java 25, 형제 디렉터리의 Doro 체크아웃(`../Doro`, SDK 를 쓴다). SDK 버전은 `.doro-sdk-ref` 의 태그로 고정한다(CI·배포가 그 태그를 받는다. 로컬도 맞추려면 `git -C ../Doro checkout $(cat .doro-sdk-ref)`). 다른 실행과 겹치면 `CI_PROJECT`·`CI_DB_PORT` 를 바꾼다.
 
 실제 푸시 서비스(FCM 등)와의 호환 확인(`PushLiveInteropTest`)은 일반 시험에서 건너뛴다. 실제 브라우저의 구독 파일과 VAPID 키 파일을 한 폴더에 두고 `PUSH_LIVE_DIR=<폴더> ./gradlew test --tests '*PushLiveInteropTest'` 로 돌린다.
 
