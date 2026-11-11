@@ -24,9 +24,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: doro-notify
+      # Doro SDK 는 .doro-sdk-ref 에 적은 태그로 고정한다(Doro main 이 바뀌어도 이 서비스 빌드는 그대로). 올릴 때는 그 파일만 바꾼다.
+      - id: sdk
+        run: echo "ref=$(tr -d '[:space:]' < doro-notify/.doro-sdk-ref)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           repository: yu-teacher/doro
+          ref: ${{ steps.sdk.outputs.ref }}
           path: Doro
       - uses: actions/setup-java@v5
         with:
