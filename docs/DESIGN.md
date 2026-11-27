@@ -15,7 +15,7 @@
 
 | 테이블 | 내용 |
 | --- | --- |
-| `notify_apps` | 앱 등록부: `app_id`, `scope_path`(알림 주소 허용 범위), 표시 이름. 마이그레이션 시드(party·blog·games·menu·hub) |
+| `notify_apps` | 앱 등록부: `app_id`, `scope_path`(알림 주소 허용 범위), 표시 이름. 마이그레이션 시드(party·blog·games·menu·hub, V5 에서 interview) |
 | `notify_types` | 알림 종류: 라벨·설명·기본값·`deprecated`. 앱이 기동 때 내부 API 로 등록 |
 | `push_subscriptions` | 구독: 사용자·앱·`device_id`·`endpoint`(UNIQUE)·`p256dh`·`auth`·연속 거절 횟수 |
 | `notify_preferences` | `(사용자, 앱, 종류)` → 켜짐/꺼짐. 행이 없으면 종류의 기본값 |
