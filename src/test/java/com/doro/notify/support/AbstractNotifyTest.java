@@ -41,6 +41,7 @@ public abstract class AbstractNotifyTest {
     // 내부 API 호출자 토큰(32자 이상). 이름은 알림 앱 id 와 같다.
     protected static final String PARTY_TOKEN = "party-test-token-" + "p".repeat(32);
     protected static final String BLOG_TOKEN = "blog-test-token-" + "b".repeat(32);
+    protected static final String INTERVIEW_TOKEN = "interview-test-token-" + "i".repeat(32);
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -53,7 +54,7 @@ public abstract class AbstractNotifyTest {
         registry.add("doro.iam.internal-url", IAM::url);
         registry.add("doro.iam.internal-token", () -> FakeIamInternal.TOKEN);
         registry.add("notify.internal-auth.mode", () -> "ENFORCE");
-        registry.add("notify.internal-auth.tokens", () -> "party:" + PARTY_TOKEN + ",blog:" + BLOG_TOKEN);
+        registry.add("notify.internal-auth.tokens", () -> "party:" + PARTY_TOKEN + ",blog:" + BLOG_TOKEN + ",interview:" + INTERVIEW_TOKEN);
         registry.add("notify.push.vapid-public-key", () -> keys.publicKey);
         registry.add("notify.push.vapid-private-key", () -> keys.privateKey);
         registry.add("notify.push.subject", () -> "mailto:ops@example.test");
